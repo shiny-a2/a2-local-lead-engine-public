@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <title>{% block title %}داشبورد پاسخ‌ها{% endblock %}</title>
+  <link rel="stylesheet" href="/static/inbox/inbox_fa.css">
+</head>
+<body>
+  <header>
+    <h1>داشبورد پاسخ‌ها</h1>
+    <nav>
+      <a href="/admin/inbox">خانه</a>
+      <a href="/admin/inbox/messages">صندوق ورودی لیدها</a>
+      <a href="/admin/inbox/bounces">Bounceها و خطاهای تحویل</a>
+      <a href="/admin/inbox/unsubscribes">لغو اشتراک‌ها</a>
+      <a href="/admin/inbox/tasks">وظایف انسانی</a>
+      <a href="/admin/inbox/mailbox-readiness">آمادگی صندوق ورودی</a>
+    </nav>
+  </header>
+  <main>
+    <section class="warning">فاز ۱۱ فقط پیام‌های ورودی را می‌خواند، دسته‌بندی می‌کند و وظیفه انسانی می‌سازد. ارسال پاسخ، follow-up و متن پاسخ AI وجود ندارد.</section>
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

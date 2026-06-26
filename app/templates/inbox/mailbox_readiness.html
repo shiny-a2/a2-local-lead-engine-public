@@ -1,0 +1,8 @@
+{% extends "inbox/base_fa.html" %}
+{% block content %}
+<h2>آمادگی صندوق ورودی</h2>
+<p>آماده: {{ plan.ready }}</p>
+<p>گپ‌ها: {{ plan.gaps }}</p>
+<p>رمزها: {{ plan.secrets }}</p>
+<p>حذف پیام/mark read پیش‌فرض انجام نمی‌شود.</p>
+{% endblock %}

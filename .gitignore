@@ -1,0 +1,27 @@
+.env
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+dist/
+build/
+*.egg-info/
+# Generated lead data / reports (contain real business names + emails) - never publish
+reports/*
+!reports/.gitkeep
+exports/*
+!exports/.gitkeep
+logs/*
+!logs/.gitkeep
+*.db
+*.sqlite
+*.sqlite3
+# extra safety: never commit any real env file (templates *.example are still tracked)
+.env
+.env.local
+.env.*.local
+

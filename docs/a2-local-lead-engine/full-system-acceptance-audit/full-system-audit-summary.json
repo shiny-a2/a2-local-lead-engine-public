@@ -1,0 +1,76 @@
+{
+  "overall_verdict": "FULL_SYSTEM_READY_WITH_FIX_PACKS",
+  "final_go_no_go": "GO_FOR_OPERATOR_SETUP_ONLY",
+  "phase_statuses": {
+    "0": "PASS",
+    "1": "WARNING_DATABASE_GAP",
+    "2": "PASS_NOT_LIVE_TESTED",
+    "3": "PASS",
+    "4": "PASS_NOT_LIVE_TESTED",
+    "5": "PASS",
+    "6": "PASS",
+    "7": "PASS_OPENAI_NOT_CALLED",
+    "8": "PASS_AI_OPTIONAL_DISABLED",
+    "9": "WARNING_AUTH_MVP",
+    "10": "WARNING_AUTH_AND_OPERATOR_CONFIG",
+    "11": "WARNING_IMAP_NOT_CONFIGURED",
+    "12": "WARNING_AUTH_MVP",
+    "13": "WARNING_PHASE14_HANDOFF_MISSING",
+    "14": "BLOCK_MISSING_IMPLEMENTATION",
+    "15": "BLOCK_MISSING_IMPLEMENTATION"
+  },
+  "critical_blockers": [
+    "Phase 14 implementation absent",
+    "Phase 15 implementation absent",
+    "Runtime database connection failed",
+    "Operator sender/DNS/unsubscribe/dashboard config missing",
+    "Country activation gates absent"
+  ],
+  "warnings": [
+    "Dashboard auth is lightweight/inconsistent",
+    "Persian dashboard mojibake found in some route/template strings",
+    "make is unavailable on this host",
+    "Live external APIs, SMTP, IMAP, and OpenAI were not run by safety policy"
+  ],
+  "operator_tasks": [
+    "Configure private database and run migrations",
+    "Set dashboard credentials and private access",
+    "Choose pilot scope",
+    "Configure sender identity and DNS",
+    "Set unsubscribe token secret and URL",
+    "Record legal/compliance decisions"
+  ],
+  "safe_next_steps": [
+    "Run doctor after DB config",
+    "Run safety check",
+    "Run dry-run smoke plan only",
+    "Implement Phase 14 before live pilot"
+  ],
+  "fixpacks": ["FP-001", "FP-002", "FP-003", "FP-004", "FP-005"],
+  "tested_commands": {
+    "pytest": "464 passed",
+    "ruff": "passed",
+    "mypy": "passed",
+    "doctor": "FOUNDATION_READY_WITH_GAPS_DATABASE_OPERATIONALERROR",
+    "safety_check": "all risky global operations blocked"
+  },
+  "dashboards": {
+    "phase9_review": "found_warning_auth_mvp",
+    "phase10_send_fa": "found_warning_auth_and_mojibake",
+    "phase11_inbox_fa": "found_warning_auth_and_mojibake",
+    "phase12_opportunity_fa": "found_warning_auth_mvp",
+    "phase13_sales_fa": "found_warning_auth_mvp",
+    "phase14_governance_fa": "missing",
+    "phase15_country_fa": "missing"
+  },
+  "env_gaps": [
+    "DATABASE_URL not operational",
+    "OPENAI_API_KEY missing",
+    "GEOAPIFY_API_KEY missing",
+    "TAVILY_API_KEY missing",
+    "NZBN_API_KEY missing",
+    "SMTP credentials missing",
+    "UNSUBSCRIBE_TOKEN_SECRET missing",
+    "dashboard username/password hash missing"
+  ]
+}

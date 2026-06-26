@@ -1,0 +1,34 @@
+body {
+  direction: rtl;
+  font-family: Tahoma, Arial, sans-serif;
+  background: #f7f7f4;
+  color: #202124;
+  margin: 0;
+}
+
+main {
+  max-width: 1040px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.warning {
+  border: 1px solid #d8c27a;
+  background: #fff8dd;
+  padding: 12px;
+  border-radius: 6px;
+}
+
+button {
+  border: 1px solid #1f2937;
+  background: #1f2937;
+  color: white;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+[dir="ltr"] {
+  direction: ltr;
+  unicode-bidi: isolate;
+}

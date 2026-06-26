@@ -1,0 +1,9 @@
+{% extends "inbox/base_fa.html" %}
+{% block content %}
+<h2>صندوق ورودی لیدها</h2>
+<table><tr><th>شناسه</th><th>فرستنده</th><th>موضوع</th><th>نوع</th></tr>
+{% for message in messages %}
+<tr><td><a href="/admin/inbox/messages/{{ message.id }}">{{ message.id }}</a></td><td>{{ message.from_email }}</td><td class="ltr">{{ message.subject }}</td><td>{{ message.message_type.value }}</td></tr>
+{% endfor %}
+</table>
+{% endblock %}

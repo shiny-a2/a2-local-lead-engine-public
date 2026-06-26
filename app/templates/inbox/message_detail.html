@@ -1,0 +1,22 @@
+{% extends "inbox/base_fa.html" %}
+{% block content %}
+<h2>جزئیات پاسخ</h2>
+{% if message %}
+<p>فرستنده: {{ message.from_email }}</p>
+<p>موضوع: <span class="ltr">{{ message.subject }}</span></p>
+<pre class="email-body">{{ message.body_text_sanitized }}</pre>
+<h3>دسته‌بندی‌ها</h3>
+{% for row in classifications %}<p>{{ row.classification.value }} - {{ row.confidence }}</p>{% endfor %}
+<form method="post" action="/admin/inbox/messages/{{ message.id }}/override-classification">
+  <select name="classification">
+    <option value="POSITIVE_INTEREST">پاسخ مثبت</option>
+    <option value="ASKING_PRICE">درخواست قیمت</option>
+    <option value="UNKNOWN_NEEDS_REVIEW">نیازمند بررسی</option>
+    <option value="UNSUBSCRIBE_REQUEST">لغو اشتراک</option>
+  </select>
+  <button type="submit">تغییر دسته‌بندی پاسخ</button>
+</form>
+<form method="post" action="/admin/inbox/messages/{{ message.id }}/create-task"><button type="submit">ایجاد وظیفه</button></form>
+<form method="post" action="/admin/inbox/messages/{{ message.id }}/suppress"><button type="submit">افزودن به لیست عدم ارسال</button></form>
+{% endif %}
+{% endblock %}

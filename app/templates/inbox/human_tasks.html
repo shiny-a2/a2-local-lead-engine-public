@@ -1,0 +1,11 @@
+{% extends "inbox/base_fa.html" %}
+{% block content %}
+<h2>وظایف انسانی</h2>
+{% for task in tasks %}
+<form method="post" action="/admin/inbox/tasks/{{ task.id }}/update">
+  <span>{{ task.task_type.value }} - {{ task.status.value }}</span>
+  <input type="hidden" name="status" value="DONE">
+  <button type="submit">بسته‌شده</button>
+</form>
+{% endfor %}
+{% endblock %}

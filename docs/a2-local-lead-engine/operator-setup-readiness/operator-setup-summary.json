@@ -1,0 +1,47 @@
+{
+  "verdict": "NO_GO_ENV_DB_BLOCKED",
+  "blockers": [
+    ".env file missing",
+    "database connectivity failed with OperationalError",
+    "migrations not verified against reachable DB",
+    "dashboard username missing",
+    "dashboard password hash missing"
+  ],
+  "warnings": [
+    "OpenAI/source/API keys are missing by safe default",
+    "sender SMTP/from/reply-to and unsubscribe secret are missing for live pilot",
+    "Phase 14 DB-backed dry-run was not run because DB is unreachable"
+  ],
+  "env_missing": [
+    "DATABASE_URL real value",
+    "PHASE9_REVIEW_USERNAME",
+    "PHASE9_REVIEW_PASSWORD_HASH",
+    "OPENAI_API_KEY",
+    "GEOAPIFY_API_KEY",
+    "TAVILY_API_KEY",
+    "NZBN_API_KEY",
+    "DEFAULT_FROM_EMAIL",
+    "DEFAULT_REPLY_TO_EMAIL",
+    "UNSUBSCRIBE_TOKEN_SECRET",
+    "SMTP_HOST",
+    "SMTP_USERNAME",
+    "SMTP_PASSWORD"
+  ],
+  "db_status": "NOT_CONNECTED_OPERATIONALERROR",
+  "migration_status": "NOT_CHECKED_DB_UNREACHABLE",
+  "dashboard_auth_status": "BLOCKED_MISSING_USERNAME_AND_PASSWORD_HASH",
+  "paths": {
+    "reports": "WRITABLE",
+    "exports": "WRITABLE",
+    "logs": "WRITABLE"
+  },
+  "safe_next_commands": [
+    "Copy-Item .env.operator.example .env",
+    "Fill DATABASE_URL and dashboard auth values manually",
+    "uv run python -m app.cli.main doctor",
+    "uv run alembic current",
+    "uv run alembic upgrade head",
+    "uv run python -m app.cli.main safety check",
+    "uv run python -m app.cli.main ops readiness --campaign auckland-local-website-pilot"
+  ]
+}

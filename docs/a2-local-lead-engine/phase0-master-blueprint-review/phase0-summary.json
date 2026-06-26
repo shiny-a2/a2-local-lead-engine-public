@@ -1,0 +1,53 @@
+{
+  "readiness_verdict": "READY_TO_START_PHASE_1_WITH_DECISIONS",
+  "phases": [
+    {"phase": 1, "name": "Foundation, Safety Gates & Project Control Layer", "criticality": "MVP-critical"},
+    {"phase": 2, "name": "Source Connectors, Raw Intake Layer & Future Personalization Evidence", "criticality": "MVP-critical"},
+    {"phase": 3, "name": "Normalization, Deduplication & Candidate Business Data Quality Engine", "criticality": "MVP-critical"},
+    {"phase": 4, "name": "Website & Contact Verification, Web Presence Tribunal & Claim Permission Layer", "criticality": "MVP-critical"},
+    {"phase": 5, "name": "Lead Scoring, Campaign Selection & Outreach Readiness Gate", "criticality": "MVP-critical"},
+    {"phase": 6, "name": "Business Insight, Economic Value Proposition & Offer Matching Engine", "criticality": "MVP-critical"},
+    {"phase": 7, "name": "Natural Personalized Email Writer", "criticality": "MVP-critical"},
+    {"phase": 8, "name": "Compliance, Quality & Human-Like Email Judge", "criticality": "MVP-critical"},
+    {"phase": 9, "name": "Human Approval Dashboard", "criticality": "MVP-critical"},
+    {"phase": 10, "name": "Controlled Email Sending", "criticality": "MVP-critical"},
+    {"phase": 11, "name": "Reply Inbox, Bounce Processing & CRM", "criticality": "MVP-critical"},
+    {"phase": 12, "name": "Manual Opportunity Planner", "criticality": "MVP-critical"},
+    {"phase": 13, "name": "Manual Sales Workspace", "criticality": "MVP-critical"},
+    {"phase": 14, "name": "Pilot Governance & Scale Decision Gate", "criticality": "MVP-critical closure"},
+    {"phase": 15, "name": "Multi-Country Expansion", "criticality": "post-MVP-scale"}
+  ],
+  "dependencies": ["1->2", "2->3", "3->4", "4->5", "5->6", "6->7", "7->8", "8->9", "9->10", "10->11", "11->12", "12->13", "13->14", "14->15"],
+  "blockers": [
+    "database target",
+    "dashboard auth",
+    "sender identity",
+    "unsubscribe domain",
+    "legal review boundary",
+    "pilot geography/category",
+    "send limits",
+    "DNS readiness",
+    "backup path",
+    "secret handling policy"
+  ],
+  "risks": [
+    "false no-website claim",
+    "compliance risk",
+    "spam deliverability risk",
+    "AI hallucination",
+    "duplicate send",
+    "secret leakage",
+    "dashboard exposure",
+    "manual workload",
+    "provider uncertainty",
+    "country expansion risk"
+  ],
+  "next_actions": [
+    "confirm DB and deployment path",
+    "confirm initial campaign/country/category",
+    "confirm dashboard auth",
+    "confirm sender/unsubscribe setup",
+    "confirm legal review boundary",
+    "start Phase 1 foundation only"
+  ]
+}

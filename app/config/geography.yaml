@@ -1,0 +1,76 @@
+# Country + city registry for lead collection.
+# City names use the English (name:en) form; the OSM connector matches either the
+# local OSM `name` or `name:en`, so these resolve worldwide. "big" = major metros,
+# "small" = smaller cities/towns (still real administrative areas with businesses).
+countries:
+  "New Zealand":
+    code: NZ
+    timezone: Pacific/Auckland
+    big: [Auckland, Wellington, Christchurch, Hamilton, Tauranga, Dunedin]
+    small: [Napier, Palmerston North, Nelson, Rotorua, New Plymouth, Whangarei, Invercargill, Gisborne, Timaru, Masterton, Blenheim, Queenstown]
+
+  "Australia":
+    code: AU
+    timezone: Australia/Sydney
+    big: [Sydney, Melbourne, Brisbane, Perth, Adelaide, Canberra]
+    small: [Hobart, Geelong, Townsville, Cairns, Ballarat, Bendigo, Darwin, Launceston, Toowoomba, Bunbury, Wollongong, Newcastle]
+
+  "United Kingdom":
+    code: GB
+    timezone: Europe/London
+    big: [London, Manchester, Birmingham, Leeds, Glasgow, Liverpool, Edinburgh]
+    small: [Brighton, York, Bath, Cambridge, Oxford, Exeter, Inverness, Norwich, Dundee, Chester, Bangor, Truro]
+
+  "Ireland":
+    code: IE
+    timezone: Europe/Dublin
+    big: [Dublin, Cork, Limerick, Galway]
+    small: [Waterford, Kilkenny, Sligo, Wexford, Tralee, Athlone, Ennis, Drogheda]
+
+  "Canada":
+    code: CA
+    timezone: America/Toronto
+    big: [Toronto, Montreal, Vancouver, Calgary, Ottawa, Edmonton]
+    small: [Victoria, Halifax, Kingston, Kelowna, Guelph, Saskatoon, Moncton, Nanaimo, Sudbury, Fredericton]
+
+  "Germany":
+    code: DE
+    timezone: Europe/Berlin
+    big: [Berlin, Munich, Hamburg, Cologne, Frankfurt, Stuttgart]
+    small: [Freiburg, Heidelberg, Regensburg, Mainz, Lubeck, Erfurt, Kiel, Potsdam, Trier, Bamberg]
+
+  "France":
+    code: FR
+    timezone: Europe/Paris
+    big: [Paris, Lyon, Marseille, Toulouse, Bordeaux, Nantes]
+    small: [Annecy, Avignon, Dijon, Reims, Biarritz, Colmar, La Rochelle, Pau, Nimes, Tours]
+
+  "Netherlands":
+    code: NL
+    timezone: Europe/Amsterdam
+    big: [Amsterdam, Rotterdam, The Hague, Utrecht, Eindhoven]
+    small: [Haarlem, Delft, Leiden, Maastricht, Groningen, Nijmegen, Breda, Zwolle, Arnhem, Deventer]
+
+  "Spain":
+    code: ES
+    timezone: Europe/Madrid
+    big: [Madrid, Barcelona, Valencia, Seville, Bilbao, Malaga]
+    small: [Granada, Salamanca, San Sebastian, Toledo, Cordoba, Santander, Girona, Cadiz, Leon, Burgos]
+
+  "Italy":
+    code: IT
+    timezone: Europe/Rome
+    big: [Rome, Milan, Naples, Turin, Florence, Bologna]
+    small: [Verona, Padua, Parma, Siena, Lecce, Bergamo, Trento, Pisa, Lucca, Ravenna]
+
+  "United Arab Emirates":
+    code: AE
+    timezone: Asia/Dubai
+    big: [Dubai, Abu Dhabi, Sharjah]
+    small: [Ajman, Al Ain, Ras Al Khaimah, Fujairah, Umm Al Quwain]
+
+  "Turkey":
+    code: TR
+    timezone: Europe/Istanbul
+    big: [Istanbul, Ankara, Izmir, Bursa, Antalya]
+    small: [Eskisehir, Konya, Gaziantep, Trabzon, Mugla, Mersin, Kayseri, Edirne]

@@ -1,0 +1,5 @@
+{% extends "inbox/base_fa.html" %}
+{% block content %}
+<h2>Bounceها و خطاهای تحویل</h2>
+{% for row in bounces %}<p>{{ row.recipient_email }} - {{ row.bounce_type.value }} - {{ row.bounce_reason }}</p>{% endfor %}
+{% endblock %}

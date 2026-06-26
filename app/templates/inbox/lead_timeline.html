@@ -1,0 +1,5 @@
+{% extends "inbox/base_fa.html" %}
+{% block content %}
+<h2>Timeline لید</h2>
+{% for row in timeline %}<p>{{ row.created_at }} - {{ row.event_summary }}</p>{% endfor %}
+{% endblock %}

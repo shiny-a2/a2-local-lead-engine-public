@@ -1,0 +1,7 @@
+body { font-family: system-ui, sans-serif; margin: 24px; color: #17202a; background: #f8fafc; }
+main { max-width: 1080px; margin: 0 auto; }
+table { border-collapse: collapse; width: 100%; background: white; }
+td, th { border: 1px solid #d8dee9; padding: 8px; text-align: left; }
+pre { white-space: pre-wrap; background: white; border: 1px solid #d8dee9; padding: 12px; }
+.safe { color: #5c6670; font-size: 0.9rem; }
+button { padding: 6px 10px; margin: 4px 0; }

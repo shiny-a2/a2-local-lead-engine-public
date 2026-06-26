@@ -1,0 +1,27 @@
+barber:
+  geoapify:
+    categories:
+      - commercial.hairdresser
+  osm:
+    tags:
+      shop:
+        - hairdresser
+
+beauty_salon:
+  geoapify:
+    categories:
+      - commercial.beauty
+  osm:
+    tags:
+      shop:
+        - beauty
+
+cleaning_service:
+  geoapify:
+    categories:
+      - service.cleaning
+  osm:
+    tags:
+      craft:
+        - cleaner
+

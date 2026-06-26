@@ -1,0 +1,29 @@
+body {
+  direction: rtl;
+  font-family: Tahoma, Arial, sans-serif;
+  margin: 0;
+  background: #f7f7f5;
+  color: #202124;
+}
+
+main {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.warning {
+  border: 1px solid #d2b35f;
+  background: #fff8df;
+  padding: 12px;
+  border-radius: 6px;
+}
+
+pre {
+  direction: ltr;
+  text-align: left;
+  white-space: pre-wrap;
+  background: #fff;
+  padding: 12px;
+  border: 1px solid #ddd;
+}

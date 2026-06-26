@@ -1,0 +1,5 @@
+{% extends "inbox/base_fa.html" %}
+{% block content %}
+<h2>لغو اشتراک‌ها</h2>
+{% for row in rows %}<p>پیام {{ row.inbound_message_id }} - لغو اشتراک</p>{% endfor %}
+{% endblock %}
