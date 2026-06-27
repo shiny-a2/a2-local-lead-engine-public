@@ -52,6 +52,8 @@ class SendQueueService:
                 continue
             domain = recipient_email.split("@")[-1].lower()
             key = guard.idempotency_key(campaign.id, decision.candidate_business_id, recipient_email)
+            if self.session.scalar(select(EmailSendQueue).where(EmailSendQueue.idempotency_key == key)):
+                continue  # already in the send queue (idempotent rebuild)
             duplicate_ok, _ = guard.check(key)
             if not duplicate_ok:
                 blocked += 1

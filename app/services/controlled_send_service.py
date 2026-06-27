@@ -123,6 +123,18 @@ class ControlledSendService:
         )
         snapshot = MessageSnapshotService(self.session, self.settings).create(item, provider_config, body_optout)
         message = self._message(provider_config, item.recipient_email, snapshot.final_subject_snapshot, snapshot.final_body_snapshot, unsubscribe_url, from_email)
+        if self.settings.pre_send_qa_enabled:
+            from app.services.pre_send_qa_service import PreSendQaService
+
+            cand = self.session.get(CandidateBusiness, item.candidate_business_id)
+            qa = PreSendQaService(self.settings).check(
+                cand.display_name if cand else "", cand.city if cand else None,
+                cand.country if cand else None, item.recipient_email,
+                snapshot.final_subject_snapshot, snapshot.final_body_snapshot,
+            )
+            if not qa["go"]:
+                self._block(item, run, Phase10Decision.HELD_FOR_MANUAL_SEND_REVIEW, EmailSendQueueStatus.HELD_BY_OPERATOR, "pre-send QA blocked: " + "; ".join(qa["issues"])[:280])
+                return
         provider = self.provider or self._provider()
         run.metadata_json = {**(run.metadata_json or {}), "provider_call_attempted": True}
         result = provider.send(message, dry_run=False)

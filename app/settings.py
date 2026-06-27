@@ -148,6 +148,7 @@ class Settings(BaseSettings):
     bounce_processing_mode: str = "planned_only"
     global_outreach_kill_switch: bool = True
     country_compliance_enforced: bool = False
+    pre_send_qa_enabled: bool = False
     controlled_send_enabled: bool = False
     provider_send_enabled: bool = False
     email_provider: str = "cpanel_smtp"
