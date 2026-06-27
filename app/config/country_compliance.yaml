@@ -1,0 +1,155 @@
+# Per-country bulk/cold email compliance rules. Conservative by design: when a country
+# requires prior opt-in consent, cold B2B email is BLOCKED by default and routed to manual
+# review (a human can confirm an existing relationship / consent). This is operational
+# guidance, not legal advice.
+#
+# consent_model:
+#   opt_out            - cold email allowed if recipient can opt out (US CAN-SPAM)
+#   inferred_b2b       - allowed to conspicuously-published business addresses relevant to
+#                        the role, with unsubscribe (NZ, AU, CA implied consent)
+#   legitimate_interest_b2b - corporate B2B allowed with care; sole traders need consent (UK)
+#   opt_in_required    - prior express consent required; cold email BLOCKED (most of EU, TR)
+#
+# fields: law, consent_model, cold_b2b_allowed, requires_unsubscribe,
+#         requires_physical_address, honor_unsub_days, risk, notes
+
+default:
+  law: "Unknown jurisdiction"
+  consent_model: opt_in_required
+  cold_b2b_allowed: false
+  requires_unsubscribe: true
+  requires_physical_address: true
+  honor_unsub_days: 10
+  risk: high
+  notes: "Unknown country - block cold email until rules are confirmed."
+
+countries:
+  "New Zealand":
+    law: "Unsolicited Electronic Messages Act 2007"
+    consent_model: inferred_b2b
+    cold_b2b_allowed: true
+    requires_unsubscribe: true
+    requires_physical_address: false
+    honor_unsub_days: 5
+    risk: low
+    notes: "Inferred consent for conspicuously published business addresses relevant to role; clear sender ID + working unsubscribe."
+
+  "Australia":
+    law: "Spam Act 2003"
+    consent_model: inferred_b2b
+    cold_b2b_allowed: true
+    requires_unsubscribe: true
+    requires_physical_address: false
+    honor_unsub_days: 5
+    risk: low
+    notes: "Inferred consent for published business addresses relevant to role and not marked 'no spam'; unsubscribe honoured within 5 business days."
+
+  "Canada":
+    law: "CASL (Canada's Anti-Spam Legislation)"
+    consent_model: inferred_b2b
+    cold_b2b_allowed: true
+    requires_unsubscribe: true
+    requires_physical_address: true
+    honor_unsub_days: 10
+    risk: medium
+    notes: "Implied consent for conspicuously published business addresses relevant to role (24 months); strict sender ID, physical address, and unsubscribe required."
+
+  "United States":
+    law: "CAN-SPAM Act"
+    consent_model: opt_out
+    cold_b2b_allowed: true
+    requires_unsubscribe: true
+    requires_physical_address: true
+    honor_unsub_days: 10
+    risk: medium
+    notes: "Opt-out regime: truthful headers, valid physical postal address, clear unsubscribe honoured within 10 days. Check state laws too."
+
+  "United Kingdom":
+    law: "PECR + UK GDPR"
+    consent_model: legitimate_interest_b2b
+    cold_b2b_allowed: true
+    requires_unsubscribe: true
+    requires_physical_address: false
+    honor_unsub_days: 10
+    risk: medium
+    notes: "Corporate bodies (Ltd/PLC) can be emailed B2B with care; sole traders/partnerships are treated as individuals and need consent. Document legitimate interest."
+
+  "Ireland":
+    law: "ePrivacy Regulations + GDPR"
+    consent_model: opt_in_required
+    cold_b2b_allowed: false
+    requires_unsubscribe: true
+    requires_physical_address: false
+    honor_unsub_days: 10
+    risk: high
+    notes: "EU opt-in regime; cold marketing email generally needs prior consent. Block by default."
+
+  "Germany":
+    law: "UWG + GDPR"
+    consent_model: opt_in_required
+    cold_b2b_allowed: false
+    requires_unsubscribe: true
+    requires_physical_address: false
+    honor_unsub_days: 10
+    risk: high
+    notes: "Very strict: prior express consent required even for B2B. Block cold email."
+
+  "France":
+    law: "CNIL / ePrivacy + GDPR"
+    consent_model: opt_in_required
+    cold_b2b_allowed: false
+    requires_unsubscribe: true
+    requires_physical_address: false
+    honor_unsub_days: 10
+    risk: high
+    notes: "Opt-in for individuals; B2B allowed only if message relates to the person's profession and consent/soft rules met. Block by default."
+
+  "Netherlands":
+    law: "Telecommunicatiewet + GDPR"
+    consent_model: opt_in_required
+    cold_b2b_allowed: false
+    requires_unsubscribe: true
+    requires_physical_address: false
+    honor_unsub_days: 10
+    risk: high
+    notes: "EU opt-in regime. Block cold email by default."
+
+  "Spain":
+    law: "LSSI + GDPR"
+    consent_model: opt_in_required
+    cold_b2b_allowed: false
+    requires_unsubscribe: true
+    requires_physical_address: false
+    honor_unsub_days: 10
+    risk: high
+    notes: "EU opt-in regime. Block cold email by default."
+
+  "Italy":
+    law: "Garante / ePrivacy + GDPR"
+    consent_model: opt_in_required
+    cold_b2b_allowed: false
+    requires_unsubscribe: true
+    requires_physical_address: false
+    honor_unsub_days: 10
+    risk: high
+    notes: "EU opt-in regime. Block cold email by default."
+
+  "United Arab Emirates":
+    law: "TDRA anti-spam regulations"
+    consent_model: opt_in_required
+    cold_b2b_allowed: false
+    requires_unsubscribe: true
+    requires_physical_address: false
+    honor_unsub_days: 10
+    risk: high
+    notes: "Consent-based; block cold email by default until confirmed."
+
+  "Turkey":
+    law: "Commercial Electronic Messages Law + KVKK (IYS)"
+    consent_model: opt_in_required
+    cold_b2b_allowed: false
+    requires_unsubscribe: true
+    requires_physical_address: false
+    honor_unsub_days: 3
+    risk: high
+    notes: "Prior consent and IYS registration required for commercial messages. Block cold email."

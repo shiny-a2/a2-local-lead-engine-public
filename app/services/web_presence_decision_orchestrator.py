@@ -21,6 +21,7 @@ from app.db.models.search_query import SearchQuery
 from app.db.models.verification_run import VerificationRun
 from app.db.models.verified_personalization_evidence import VerifiedPersonalizationEvidence
 from app.services.claim_permission_service import ClaimPermissionService
+from app.services.contact_discovery_service import ContactDiscoveryService
 from app.services.contact_extraction_service import ContactExtractionService
 from app.services.contact_verification_service import ContactVerificationService
 from app.services.phase4_manual_review_service import Phase4ManualReviewService
@@ -103,6 +104,14 @@ class Phase4VerificationOrchestrator:
                     contact_results.append(
                         {"title": candidate.display_name, "url": None, "snippet": email}
                     )
+            if self.settings.contact_discovery_enabled:
+                # Find the business's public contact email on the web (Tavily).
+                contact_results.extend(
+                    ContactDiscoveryService(self.settings).discovery_results(
+                        candidate.display_name, candidate.city or candidate.suburb,
+                        candidate.canonical_category,
+                    )
+                )
             contacts = self._store_contacts(
                 candidate, run.id, contact_results, web.official_website_domain
             )

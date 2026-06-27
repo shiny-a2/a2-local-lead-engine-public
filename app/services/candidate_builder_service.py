@@ -140,7 +140,8 @@ class CandidateBuilderService:
                     lng=raw.raw_lng,
                     geo_hash=geo_hash,
                     geo_confidence=0.9 if raw.raw_lat and raw.raw_lng else 0.4,
-                    identity_confidence=0.8,
+                    # 0-100 scale to match the readiness gate (identity_confidence >= 60).
+                    identity_confidence=80.0,
                     category_confidence=0.8,
                     chain_risk_score=chain_score,
                     generic_name_risk_score=name.generic_risk_score,

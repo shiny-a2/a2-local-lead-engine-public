@@ -40,6 +40,8 @@ class Settings(BaseSettings):
     tavily_api_key: str = ""
     website_verification_enabled: bool = False
     contact_verification_enabled: bool = False
+    contact_discovery_enabled: bool = False
+    contact_discovery_max_results: int = 5
     nzbn_api_key: str = ""
     openai_api_key: str = ""
     openai_email_model: str = ""
@@ -99,6 +101,8 @@ class Settings(BaseSettings):
     email_judge_enabled: bool = False
     email_ai_judge_enabled: bool = False
     email_judge_mode: str = "RULE_ONLY"
+    email_relevance_agent_enabled: bool = False
+    email_relevance_min_score: int = 70
     openai_judge_model: str = ""
     openai_judge_temperature: float = 0.0
     openai_judge_max_tokens: int = 1000
@@ -143,6 +147,7 @@ class Settings(BaseSettings):
     mailbox_monitoring_mode: str = "planned_only"
     bounce_processing_mode: str = "planned_only"
     global_outreach_kill_switch: bool = True
+    country_compliance_enforced: bool = False
     controlled_send_enabled: bool = False
     provider_send_enabled: bool = False
     email_provider: str = "cpanel_smtp"

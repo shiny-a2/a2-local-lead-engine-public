@@ -16,11 +16,13 @@ from app.core.enums import (
 )
 from app.core.run_context import RunContext
 from app.db.models.campaign import Campaign
+from app.db.models.candidate_business import CandidateBusiness
 from app.db.models.email_send_attempt import EmailSendAttempt
 from app.db.models.email_send_queue import EmailSendQueue
 from app.db.models.phase10_candidate_decision import Phase10CandidateDecision
 from app.db.models.send_audit_event import SendAuditEvent
 from app.db.models.send_queue_run import SendQueueRun
+from app.services.country_compliance_service import CountryComplianceService
 from app.services.cpanel_smtp_provider import CpanelSmtpProvider
 from app.services.list_unsubscribe_header_service import ListUnsubscribeHeaderService
 from app.services.message_snapshot_service import MessageSnapshotService
@@ -91,6 +93,12 @@ class ControlledSendService:
         if not suppression_ok:
             self._block(item, run, Phase10Decision.BLOCKED_BY_SUPPRESSION, EmailSendQueueStatus.BLOCKED_BY_SUPPRESSION, ";".join(suppression_flags))
             return
+        if self.settings.country_compliance_enforced:
+            candidate = self.session.get(CandidateBusiness, item.candidate_business_id)
+            compliance = CountryComplianceService().evaluate(candidate.country if candidate else None)
+            if not compliance["allowed"]:
+                self._block(item, run, Phase10Decision.BLOCKED_BY_COUNTRY_COMPLIANCE, EmailSendQueueStatus.BLOCKED_BY_COUNTRY_COMPLIANCE, compliance["block_reason"] or "country requires opt-in consent")
+                return
         limits_ok, limit_flags = SendLimitService(self.session, self.settings).check(run.id, item.recipient_domain)
         if not limits_ok:
             self._block(item, run, Phase10Decision.BLOCKED_BY_DAILY_LIMIT, EmailSendQueueStatus.BLOCKED_BY_DAILY_LIMIT, ";".join(limit_flags))

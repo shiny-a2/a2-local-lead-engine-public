@@ -15,6 +15,7 @@ from app.logging_config import configure_logging
 from app.settings import get_settings
 from app.web.inbox_routes import router as inbox_dashboard_router
 from app.web.opportunity_routes import router as opportunity_dashboard_router
+from app.web.overview_routes import router as overview_router
 from app.web.pilot_governance_routes import router as pilot_governance_dashboard_router
 from app.web.review_routes import router as review_dashboard_router
 from app.web.sales_workspace_routes import router as sales_workspace_dashboard_router
@@ -31,6 +32,7 @@ app = FastAPI(
 )
 app.include_router(health_router)
 app.include_router(status_router)
+app.include_router(overview_router)
 app.include_router(campaigns_router)
 app.include_router(safety_router)
 app.include_router(sources_router)

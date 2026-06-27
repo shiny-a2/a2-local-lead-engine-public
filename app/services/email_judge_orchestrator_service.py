@@ -15,6 +15,7 @@ from app.core.enums import (
 )
 from app.core.run_context import RunContext
 from app.db.models.campaign import Campaign
+from app.db.models.candidate_business import CandidateBusiness
 from app.db.models.email_draft_claim_usage import EmailDraftClaimUsage
 from app.db.models.email_draft_evidence_link import EmailDraftEvidenceLink
 from app.db.models.email_draft_precheck_result import EmailDraftPrecheckResult
@@ -25,6 +26,7 @@ from app.db.models.email_judge_run import EmailJudgeRun
 from app.db.models.email_variant_selection import EmailVariantSelection
 from app.db.models.phase8_candidate_decision import Phase8CandidateDecision
 from app.services.email_ai_judge_service import EmailAiJudgeService
+from app.services.email_relevance_agent_service import EmailRelevanceAgentService
 from app.services.email_rule_judge_service import EmailRuleJudgeService
 from app.services.judge_disagreement_service import JudgeDisagreementService
 from app.services.phase8_manual_review_service import Phase8ManualReviewService
@@ -34,10 +36,11 @@ from app.settings import Settings
 
 
 class EmailJudgeOrchestratorService:
-    def __init__(self, session: Session, settings: Settings, ai_client=None):
+    def __init__(self, session: Session, settings: Settings, ai_client=None, relevance_agent=None):
         self.session = session
         self.settings = settings
         self.ai_client = ai_client
+        self.relevance_agent = relevance_agent
 
     def eligible(self, campaign_slug: str, generation_run_id: str | None = None, limit: int | None = None) -> list[EmailDraftVariant]:
         campaign = self.session.scalar(select(Campaign).where(Campaign.slug == campaign_slug))
@@ -108,6 +111,31 @@ class EmailJudgeOrchestratorService:
             run.metadata_json = {**(run.metadata_json or {}), "ai_judge_call_attempted": True}
             ai_result = ai_service.judge(run.id, draft)
         decision, quality = self._decision(rule_result.passed, findings, ai_result)
+        if self.settings.email_relevance_agent_enabled:
+            candidate = self.session.get(CandidateBusiness, draft.candidate_business_id)
+            agent = self.relevance_agent or EmailRelevanceAgentService(self.settings)
+            relevance = agent.check(
+                candidate.display_name if candidate else "",
+                candidate.city if candidate else None,
+                candidate.canonical_category if candidate else None,
+                draft.subject_text,
+                draft.body_text,
+            )
+            if (
+                not relevance["relevant"]
+                or relevance["score"] < self.settings.email_relevance_min_score
+            ):
+                decision = EmailJudgeDecisionValue.MANUAL_REVIEW_REQUIRED
+                quality = min(quality, float(relevance["score"]))
+                findings = [
+                    *findings,
+                    {
+                        "finding_type": "BUSINESS_RELEVANCE_LOW",
+                        "severity": GateSeverity.BLOCKER.value,
+                        "message": f"Email may not match this business: {relevance['reason']}",
+                        "evidence_json": relevance,
+                    },
+                ]
         if persist:
             self.session.add(rule_result)
             if ai_result:
