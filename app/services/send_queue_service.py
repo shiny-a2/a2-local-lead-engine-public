@@ -46,9 +46,11 @@ class SendQueueService:
             if not check or check.check_status.value == "FAILED":
                 blocked += 1
                 continue
-            # The verified final check already validated recipient. Keep deterministic fixture fallback.
-            recipient_email = "hello@example.com"
-            domain = recipient_email.split("@")[-1]
+            recipient_email = self._recipient_email(decision.candidate_business_id)
+            if not recipient_email:
+                blocked += 1  # no safe verified contact -> cannot send
+                continue
+            domain = recipient_email.split("@")[-1].lower()
             key = guard.idempotency_key(campaign.id, decision.candidate_business_id, recipient_email)
             duplicate_ok, _ = guard.check(key)
             if not duplicate_ok:
@@ -75,3 +77,17 @@ class SendQueueService:
         if item is None:
             raise ValueError("phase9 queue item not found")
         return item.email_draft_variant_id
+
+    def _recipient_email(self, candidate_business_id: int) -> str | None:
+        """The candidate's verified, outreach-allowed contact email (no placeholder)."""
+        from app.db.models.candidate_contact_verification import CandidateContactVerification
+
+        contact = self.session.scalar(
+            select(CandidateContactVerification)
+            .where(
+                CandidateContactVerification.candidate_business_id == candidate_business_id,
+                CandidateContactVerification.outreach_contact_allowed.is_(True),
+            )
+            .order_by(CandidateContactVerification.id.desc())
+        )
+        return contact.best_email if contact and contact.best_email else None

@@ -4,6 +4,7 @@ import httpx
 
 from app.core.enums import SensitiveOperation
 from app.core.safety import check_operation
+from app.services.contact_relevance_service import ContactRelevanceService
 from app.settings import Settings
 
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w.-]+\.[a-zA-Z]{2,}")
@@ -37,10 +38,11 @@ class ContactDiscoveryService:
             return False, "LIVE_API_CALLS_DISABLED"
         return True, "ALLOWED"
 
-    def search_emails(self, business_name: str, city: str | None, category: str | None = None) -> list[dict]:
+    def search_emails(self, business_name: str, city: str | None, category: str | None = None, country: str | None = None) -> list[dict]:
         ok, _reason = self.can_run()
         if not ok or not business_name:
             return []
+        relevance = ContactRelevanceService()
         query = " ".join(
             part for part in [business_name, city or "", (category or "").replace("_", " "), "contact email"] if part
         )
@@ -67,6 +69,9 @@ class ContactDiscoveryService:
                 if low in seen or any(tok in low for tok in SKIP_TOKENS):
                     continue
                 seen.add(low)
+                # Drop emails that belong to a different / directory business.
+                if not relevance.is_plausible(business_name, country, email)[0]:
+                    continue
                 found.append(
                     {
                         "email": email,
@@ -77,7 +82,7 @@ class ContactDiscoveryService:
                 )
         return found
 
-    def discovery_results(self, business_name: str, city: str | None, category: str | None = None) -> list[dict]:
+    def discovery_results(self, business_name: str, city: str | None, category: str | None = None, country: str | None = None) -> list[dict]:
         """Result dicts shaped for ContactExtractionService (title / url / snippet)."""
         return [
             {
@@ -85,5 +90,5 @@ class ContactDiscoveryService:
                 "url": item["source_url"],
                 "snippet": f"{business_name} {city or ''} {item['email']}",
             }
-            for item in self.search_emails(business_name, city, category)
+            for item in self.search_emails(business_name, city, category, country)
         ]

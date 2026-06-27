@@ -167,6 +167,9 @@ class Settings(BaseSettings):
     send_window_outside_policy: str = "block"
     unsubscribe_public_base_url: str = "https://amiraliyaghouti.com/unsubscribe"
     unsubscribe_token_secret: str = ""
+    # Advertise RFC 8058 one-click POST only once the public unsubscribe endpoint is deployed;
+    # until then the working opt-out is the mailto/reply path.
+    unsubscribe_one_click_enabled: bool = False
     delivery_events_enabled: bool = False
     bounce_webhooks_enabled: bool = False
     cpanel_bounce_mode: str = "manual_inbox_review"

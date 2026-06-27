@@ -114,8 +114,15 @@ class ControlledSendService:
         token, raw = UnsubscribeTokenService(self.session, self.settings).create(item.campaign_id, item.candidate_business_id, item.recipient_email, item.id)
         item.unsubscribe_token_id = token.id
         unsubscribe_url = UnsubscribeTokenService(self.session, self.settings).url(raw)
-        snapshot = MessageSnapshotService(self.session, self.settings).create(item, provider_config, unsubscribe_url)
-        message = self._message(provider_config, item.recipient_email, snapshot.final_subject_snapshot, snapshot.final_body_snapshot, unsubscribe_url)
+        from_email = provider_config.from_email
+        # The body opt-out is reply/mailto based so it works WITHOUT a deployed web endpoint;
+        # the token URL still rides in the List-Unsubscribe header for when the page is live.
+        body_optout = (
+            f"To stop receiving these emails, reply to this message with the word UNSUBSCRIBE, "
+            f"or email {from_email} with the subject Unsubscribe and you will be removed."
+        )
+        snapshot = MessageSnapshotService(self.session, self.settings).create(item, provider_config, body_optout)
+        message = self._message(provider_config, item.recipient_email, snapshot.final_subject_snapshot, snapshot.final_body_snapshot, unsubscribe_url, from_email)
         provider = self.provider or self._provider()
         run.metadata_json = {**(run.metadata_json or {}), "provider_call_attempted": True}
         result = provider.send(message, dry_run=False)
@@ -139,13 +146,15 @@ class ControlledSendService:
         self.session.add(SendAuditEvent(email_send_queue_id=item.id, actor="cli", action=SendAuditAction.SENT_TO_PROVIDER if sent else SendAuditAction.SEND_FAILED))
         self.session.flush()
 
-    def _message(self, provider_config, recipient: str, subject: str, body: str, unsubscribe_url: str) -> EmailMessage:
+    def _message(self, provider_config, recipient: str, subject: str, body: str, unsubscribe_url: str, mailto_email: str | None = None) -> EmailMessage:
         msg = EmailMessage()
         msg["From"] = f"{provider_config.from_name} <{provider_config.from_email}>"
         msg["To"] = recipient
         msg["Reply-To"] = provider_config.reply_to_email
         msg["Subject"] = subject
-        ListUnsubscribeHeaderService().add(msg, unsubscribe_url)
+        ListUnsubscribeHeaderService().add(
+            msg, unsubscribe_url, mailto_email, self.settings.unsubscribe_one_click_enabled
+        )
         msg.set_content(body)
         return msg
 

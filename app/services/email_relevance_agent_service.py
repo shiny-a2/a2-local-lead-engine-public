@@ -24,7 +24,13 @@ class EmailRelevanceAgentService:
         body: str,
     ) -> dict:
         if not self.settings.openai_api_key and self._client is None:
-            return {"relevant": True, "score": 100, "reason": "relevance agent skipped (no key)"}
+            # Fail CLOSED: if the agent is on but cannot run, send the draft to manual review
+            # rather than silently passing it.
+            return {
+                "relevant": False,
+                "score": 0,
+                "reason": "relevance agent enabled but no OpenAI key - manual review required",
+            }
         client = self._client or OpenAIClient(self.settings)
         system = (
             "You are a strict reviewer of cold outreach emails. Decide whether the drafted "
