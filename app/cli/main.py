@@ -41,6 +41,7 @@ send_app = typer.Typer(no_args_is_help=True)
 inbox_app = typer.Typer(no_args_is_help=True)
 opportunity_app = typer.Typer(no_args_is_help=True)
 geo_app = typer.Typer(no_args_is_help=True)
+improvement_app = typer.Typer(no_args_is_help=True)
 
 
 def session_for_cli():
@@ -1824,6 +1825,35 @@ def ops_export(campaign: Annotated[str, typer.Option()]) -> None:
     console.print("secrets_exported=false")
 
 
+@improvement_app.command("generate")
+def improvement_generate(
+    campaign: Annotated[str, typer.Option()],
+    limit: Annotated[int, typer.Option()] = 25,
+    dry_run: Annotated[bool, typer.Option("--dry-run")] = True,
+    commit: Annotated[bool, typer.Option("--commit")] = False,
+) -> None:
+    """Separate 'improve your existing website' batch for businesses that already have a site."""
+    from app.services.email_judge_orchestrator_service import EmailJudgeOrchestratorService
+    from app.services.email_writer_service import EmailWriterService
+    from app.services.human_review_queue_service import HumanReviewQueueService
+
+    live = _commit_mode(dry_run, commit)
+    settings = get_settings()
+    with session_for_cli() as session:
+        gen = EmailWriterService(session, settings).generate_improvement(campaign, limit, live)
+        judged = EmailJudgeOrchestratorService(session, settings).judge_emails(
+            campaign, gen.run_id, commit=live
+        )
+        review = HumanReviewQueueService(session, settings).build_queue(
+            campaign, judged.run_id, live
+        )
+    console.print("campaign_type=improvement (separate from the no-website batch)")
+    console.print(f"improvement_generation_run={gen.run_id} drafts={gen.draft_created_count}")
+    console.print(f"judge_run={judged.run_id} verdict={judged.status.value}")
+    console.print(f"review_run={review.run_id} queued={review.queued_count}")
+    console.print("email_sent=false")
+
+
 @geo_app.command("countries")
 def geo_countries() -> None:
     from app.services.geography_service import GeographyService
@@ -1930,6 +1960,7 @@ app.add_typer(inbox_app, name="inbox")
 app.add_typer(opportunity_app, name="opportunity")
 app.add_typer(sales_workspace_app, name="sales-workspace")
 app.add_typer(geo_app, name="geo")
+app.add_typer(improvement_app, name="improvement")
 
 
 if __name__ == "__main__":

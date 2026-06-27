@@ -42,6 +42,7 @@ def overview() -> HTMLResponse:
         scored = _count(session, CandidateLeadScore)
         ready6 = _count(session, Phase5CandidateDecision, Phase5CandidateDecision.ready_for_phase6.is_(True))
         drafts = _count(session, EmailDraftVariant)
+        improvement = _count(session, EmailDraftVariant, EmailDraftVariant.campaign_lane == "IMPROVEMENT")
         queued = _count(session, HumanReviewQueueItem)
         send_q = _count(session, EmailSendQueue)
 
@@ -87,6 +88,7 @@ def overview() -> HTMLResponse:
         _card("امتیازخورده", scored),
         _card("آماده برای ایمیل", ready6, "تماس امن + شواهد کافی"),
         _card("پیش‌نویس ایمیل (GPT)", drafts),
+        _card("ایمیل بهبودِ سایت", improvement, "کمپین جدا - دارای سایت"),
         _card("در صف بازبینی انسانی", queued),
         _card("در صف ارسال", send_q, "ارسال واقعی خاموش است"),
         _card("تماس امن یافت‌شده", allowed_contacts, "ایمیل کاری/نقش‌محور"),

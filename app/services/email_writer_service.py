@@ -1,3 +1,4 @@
+import hashlib
 import json
 from collections.abc import Callable
 from datetime import UTC, datetime
@@ -9,12 +10,15 @@ from app.core.enums import (
     EmailDraftVariantStatus,
     EmailGenerationOperation,
     EmailGenerationRunStatus,
+    Phase4WebsiteStatus,
     Phase6Decision,
     Phase7Decision,
 )
 from app.core.run_context import RunContext
 from app.db.models.campaign import Campaign
 from app.db.models.candidate_business import CandidateBusiness
+from app.db.models.candidate_contact_verification import CandidateContactVerification
+from app.db.models.candidate_web_presence_verification import CandidateWebPresenceVerification
 from app.db.models.email_draft_variant import EmailDraftVariant
 from app.db.models.email_generation_input import EmailGenerationInput
 from app.db.models.email_generation_run import EmailGenerationRun
@@ -195,7 +199,8 @@ class EmailWriterService:
             "3-4 sentence email). Reach the length naturally with: one sentence naming the "
             "business and its area, one or two on how a simple website helps customers act, one "
             "that it can start small and grow, one introducing Amirali, and one short closing "
-            f"question. Keep it under {self.settings.email_max_words - 10} words. Use exactly one "
+            f"question. Keep it under {self.settings.email_max_words - 10} words. Use a calm, plain "
+            "tone with NO exclamation marks. Use exactly one "
             "soft call to action (a question, no hard sell); ground every claim ONLY in the "
             "offer ideas/allowed claims; never invent facts, prices, guarantees, commissions, or "
             "mention Google Maps; sign as Amirali Yaghouti; end the body with the literal token "
@@ -290,6 +295,194 @@ class EmailWriterService:
                 manual_review_required=draft.status != EmailDraftVariantStatus.JUDGE_PENDING,
                 warnings_json=precheck.risk_flags_json,
             )
+        )
+
+    # ---- Website IMPROVEMENT campaign (separate from the no-website "build" campaign) ----
+
+    def generate_improvement(self, campaign_slug: str, limit: int, commit: bool) -> EmailGenerationRun:
+        """Generate 'improve your existing website' emails for businesses that already
+        have a real site and a safe contact. Separate batch from the no-website campaign."""
+        campaign = self.session.scalar(select(Campaign).where(Campaign.slug == campaign_slug))
+        if campaign is None:
+            raise ValueError("campaign not found")
+        candidates = self._improvement_eligible(campaign_slug, limit)
+        run = EmailGenerationRun(
+            run_id=RunContext().run_id,
+            campaign_id=campaign.id,
+            operation=EmailGenerationOperation.PHASE7_FULL_GENERATION,
+            status=EmailGenerationRunStatus.STARTED,
+            dry_run=not commit,
+            model_provider="openai" if self._ai_allowed() else "local_template",
+            model_name=self.settings.openai_email_model or "local_template_v1",
+            input_candidate_count=len(candidates),
+            metadata_json={
+                "campaign_type": "improvement",
+                "openai_calls_attempted": self._ai_allowed(),
+            },
+        )
+        self.session.add(run)
+        self.session.flush()
+        if not candidates:
+            run.status = EmailGenerationRunStatus.DRY_RUN_ONLY
+        elif not commit:
+            run.status = EmailGenerationRunStatus.DRY_RUN_ONLY
+        elif not self._generation_allowed():
+            run.status = EmailGenerationRunStatus.BLOCKED_BY_AI_CONFIG
+        else:
+            for candidate, website_url in candidates:
+                self._generate_improvement_for_candidate(run, candidate, website_url)
+        self.session.flush()
+        self._finish(run)
+        self.session.commit()
+        return run
+
+    def _improvement_eligible(self, campaign_slug: str, limit: int | None) -> list[tuple[CandidateBusiness, str]]:
+        campaign = self.session.scalar(select(Campaign).where(Campaign.slug == campaign_slug))
+        if campaign is None:
+            return []
+        rows: list[tuple[CandidateBusiness, str]] = []
+        candidates = self.session.scalars(
+            select(CandidateBusiness).where(CandidateBusiness.campaign_id == campaign.id)
+        ).all()
+        for candidate in candidates:
+            web = self.session.scalar(
+                select(CandidateWebPresenceVerification)
+                .where(
+                    CandidateWebPresenceVerification.candidate_business_id == candidate.id,
+                    CandidateWebPresenceVerification.website_status
+                    == Phase4WebsiteStatus.WEBSITE_FOUND_OFFICIAL,
+                )
+                .order_by(CandidateWebPresenceVerification.id.desc())
+            )
+            if web is None:
+                continue
+            contact = self.session.scalar(
+                select(CandidateContactVerification)
+                .where(
+                    CandidateContactVerification.candidate_business_id == candidate.id,
+                    CandidateContactVerification.outreach_contact_allowed.is_(True),
+                )
+                .order_by(CandidateContactVerification.id.desc())
+            )
+            if contact is None:
+                continue
+            rows.append((candidate, web.official_website_url or web.official_website_domain or ""))
+        return rows[:limit] if limit else rows
+
+    def _generate_improvement_for_candidate(self, run, candidate, website_url) -> None:
+        gen_input = self._improvement_input(run, candidate, website_url)
+        self.session.add(gen_input)
+        self.session.flush()
+        try:
+            payload = json.loads(self._improvement_model_output(gen_input, website_url))
+            drafts = payload["drafts"]
+        except Exception:
+            run.failed_count += 1
+            self.session.add(
+                Phase7CandidateDecision(
+                    candidate_business_id=candidate.id,
+                    email_generation_run_id=run.id,
+                    decision=Phase7Decision.FAILED_GENERATION,
+                    reject_reason="invalid JSON output (improvement)",
+                )
+            )
+            return
+        for item in drafts[: self.settings.email_generation_max_variants_per_candidate]:
+            self._store_variant(run, candidate, gen_input, "improvement", item)
+
+    def _improvement_input(self, run, candidate, website_url) -> EmailGenerationInput:
+        local = candidate.suburb or candidate.city or ""
+        offer = "a clearer, faster, more modern version of your current website"
+        snapshot = {
+            "business_name": candidate.display_name,
+            "category": candidate.canonical_category,
+            "local_context": local,
+            "campaign_lane": "IMPROVEMENT",
+            "offer_summary": offer,
+            "website_url": website_url,
+            "unsubscribe_placeholder": self.settings.email_unsubscribe_placeholder,
+        }
+        payload = {"input_snapshot": snapshot, "offer": offer, "website": website_url}
+        digest = hashlib.sha256(json.dumps(payload, sort_keys=True).encode()).hexdigest()
+        return EmailGenerationInput(
+            email_generation_run_id=run.id,
+            candidate_business_id=candidate.id,
+            phase6_decision_id=None,
+            input_snapshot_json=snapshot,
+            input_snapshot_hash=digest,
+            allowed_claims_json=[offer],
+            blocked_claims_json=[],
+            offer_blocks_json=[],
+            verified_evidence_json=[
+                {"type": "business_name", "value": candidate.display_name},
+                {"type": "local_context", "value": local},
+            ],
+            style_constraints_json={
+                "min_words": self.settings.email_min_words,
+                "max_words": self.settings.email_max_words,
+                "no_send": True,
+            },
+            cta_options_json=["quick_idea", "improvement_idea"],
+        )
+
+    def _improvement_model_output(self, gen_input, website_url) -> str:
+        if self._ai_allowed():
+            return self._openai_improvement_json(gen_input, website_url)
+        return self._local_improvement_json(gen_input, website_url)
+
+    def _openai_improvement_json(self, gen_input, website_url) -> str:
+        from app.services.openai_client import OpenAIClient
+
+        snap = gen_input.input_snapshot_json
+        placeholder = snap.get("unsubscribe_placeholder", self.settings.email_unsubscribe_placeholder)
+        system = (
+            "You write a short, honest improvement-pitch cold email for Amirali Yaghouti, who "
+            "refreshes and improves websites for local businesses. IMPORTANT: this business "
+            "ALREADY HAS a website; never say they lack one. Offer to make their existing site "
+            "clearer, faster, more modern, and better at turning visitors into customers. Write "
+            "the body as 5 to 6 complete sentences. The "
+            f"body MUST be between {self.settings.email_min_words + 30} and "
+            f"{self.settings.email_max_words - 10} words (never under "
+            f"{self.settings.email_min_words + 10}); exactly one soft question as the call to "
+            "action; use a calm, plain tone with NO exclamation marks; invent no facts (no fake "
+            "problems, awards, prices); sign as Amirali "
+            f"Yaghouti; end the body with the literal token {placeholder}. Return ONLY JSON: "
+            '{"drafts":[{"variant_label":"A","subject":"...","body":"...","evidence_keys":'
+            '["business_name","local_context"],"claim_texts":["..."]}, {"variant_label":"B",...}]}'
+            f" with subjects of at most {self.settings.email_max_subject_words} words."
+        )
+        user = json.dumps(
+            {
+                "business_name": snap.get("business_name"),
+                "local_context": snap.get("local_context"),
+                "category": snap.get("category"),
+                "current_website": website_url,
+                "offer_idea": snap.get("offer_summary"),
+            },
+            ensure_ascii=False,
+        )
+        return OpenAIClient(self.settings).chat_json(system, user)
+
+    def _local_improvement_json(self, gen_input, website_url) -> str:
+        snap = gen_input.input_snapshot_json
+        name = snap["business_name"]
+        local = snap["local_context"]
+        body = (
+            f"I came across {name} around {local} and had a look at your current website. "
+            "It already does the basics, and with a few focused changes it could load faster, "
+            "read more clearly on phones, and guide visitors to contact or book you more "
+            "directly. I am Amirali Yaghouti, and I refresh simple local-business websites so "
+            "they convert a little better without a full rebuild. The work can start small and "
+            "only grow if it proves useful to you. "
+            f"Would a quick, no-pressure idea for your site be useful? {self.settings.email_unsubscribe_placeholder}"
+        )
+        return json.dumps(
+            {
+                "drafts": [
+                    {"variant_label": "A", "subject": f"A quick idea for {name}".split(",")[0], "body": body, "evidence_keys": ["business_name", "local_context"], "claim_texts": [snap["offer_summary"]]},
+                    {"variant_label": "B", "subject": "Freshening up your website", "body": body.replace("a few focused changes", "a light refresh"), "evidence_keys": ["business_name", "local_context"], "claim_texts": [snap["offer_summary"]]},
+                ]
+            }
         )
 
     def _finish(self, run: EmailGenerationRun) -> None:
