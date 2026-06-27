@@ -46,7 +46,9 @@ def main() -> None:
         candidate.suburb = suburb
         session.commit()
         EmailWriterService(session, settings).generate(campaign.slug, None, 10, commit=True)
-        EmailJudgeOrchestratorService(session, settings).judge_emails(campaign.slug, None, commit=True)
+        EmailJudgeOrchestratorService(session, settings).judge_emails(
+            campaign.slug, None, commit=True
+        )
         HumanReviewQueueService(session, settings).build_queue(campaign.slug, None, commit=True)
         PilotAuditService(session, settings).run(campaign.slug, True)
         session.commit()
