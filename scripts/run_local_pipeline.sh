@@ -26,7 +26,8 @@ export CONTACT_VERIFICATION_ENABLED=true
 export URL_PROBE_ENABLED=true              # keyless web probe
 export PHASE4_LIVE_URL_PROBE=true          # use real probe instead of fixtures
 export EMAIL_DRAFTING_ENABLED=true
-if [ -n "${OPENAI_API_KEY:-}" ]; then
+# Use real GPT if a key is present either in the shell or in .env; else the free local writer.
+if [ -n "${OPENAI_API_KEY:-}" ] || { [ -f .env ] && grep -qE '^OPENAI_API_KEY=.+' .env; }; then
   export AI_GENERATION_ENABLED=true            # real GPT drafting (key present)
   export OPENAI_EMAIL_MODEL="${OPENAI_EMAIL_MODEL:-gpt-4o-mini}"
   echo "(email writer: OpenAI GPT, model=$OPENAI_EMAIL_MODEL)"

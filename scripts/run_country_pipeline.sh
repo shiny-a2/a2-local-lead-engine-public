@@ -19,7 +19,7 @@ export LIVE_API_CALLS_ENABLED=true LEAD_COLLECTION_ENABLED=true
 export WEBSITE_VERIFICATION_ENABLED=true CONTACT_VERIFICATION_ENABLED=true
 export URL_PROBE_ENABLED=true PHASE4_LIVE_URL_PROBE=true
 export EMAIL_DRAFTING_ENABLED=true
-if [ -n "${OPENAI_API_KEY:-}" ]; then
+if [ -n "${OPENAI_API_KEY:-}" ] || { [ -f .env ] && grep -qE '^OPENAI_API_KEY=.+' .env; }; then
   export AI_GENERATION_ENABLED=true
   export OPENAI_EMAIL_MODEL="${OPENAI_EMAIL_MODEL:-gpt-4o-mini}"
 else
