@@ -25,3 +25,4 @@ logs/*
 .env.local
 .env.*.local
 
+.acquisition_counter
