@@ -30,11 +30,13 @@ from app.services.offer_readiness_gate_service import OfferReadinessGateService
 from app.services.pain_point_hypothesis_service import PainPointHypothesisService
 from app.services.phase6_manual_review_service import Phase6ManualReviewService
 from app.services.price_positioning_service import PricePositioningService
+from app.settings import Settings
 
 
 class BusinessInsightOrchestratorService:
-    def __init__(self, session: Session):
+    def __init__(self, session: Session, settings: Settings | None = None):
         self.session = session
+        self.settings = settings or Settings()
 
     def eligible(self, campaign_slug: str, limit: int | None = None) -> list[tuple[CandidateBusiness, Phase5CandidateDecision, CampaignLane]]:
         campaign = self.session.scalar(select(Campaign).where(Campaign.slug == campaign_slug))
@@ -51,8 +53,17 @@ class BusinessInsightOrchestratorService:
                 ),
             )
         ).all()
+        insighted_ids: set[int] = set()
+        if self.settings.pipeline_skip_processed:
+            insighted_ids = set(
+                self.session.scalars(select(Phase6CandidateDecision.candidate_business_id)).all()
+            )
         rows: list[tuple[CandidateBusiness, Phase5CandidateDecision, CampaignLane]] = []
+        seen: set[int] = set()
         for decision in decisions:
+            if decision.candidate_business_id in insighted_ids or decision.candidate_business_id in seen:
+                continue
+            seen.add(decision.candidate_business_id)
             candidate = self.session.get(CandidateBusiness, decision.candidate_business_id)
             if candidate is None or candidate.campaign_id != campaign.id:
                 continue

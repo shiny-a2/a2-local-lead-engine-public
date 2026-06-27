@@ -60,8 +60,18 @@ class EmailWriterService:
                 ),
             )
         ).all()
+        drafted_ids: set[int] = set()
+        if self.settings.pipeline_skip_processed:
+            drafted_ids = set(
+                self.session.scalars(select(EmailDraftVariant.candidate_business_id)).all()
+            )
         rows = []
+        seen: set[int] = set()
         for decision in decisions:
+            cid = decision.candidate_business_id
+            if cid in seen or cid in drafted_ids:
+                continue  # one draft per candidate; never re-draft (idempotent engine)
+            seen.add(cid)
             candidate = self.session.get(CandidateBusiness, decision.candidate_business_id)
             if candidate and candidate.campaign_id == campaign.id:
                 rows.append((candidate, decision))

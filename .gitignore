@@ -26,3 +26,4 @@ logs/*
 .env.*.local
 
 .acquisition_counter
+.engine.lock

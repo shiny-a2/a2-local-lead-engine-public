@@ -39,10 +39,15 @@ class Phase4VerificationOrchestrator:
         self.session = session
 
     def eligible_candidates(self, limit: int) -> list[CandidateBusiness]:
-        query = select(CandidateBusiness).order_by(CandidateBusiness.id).limit(limit)
+        query = select(CandidateBusiness).order_by(CandidateBusiness.id)
         if self.settings.phase4_require_candidate_ready:
             query = query.where(CandidateBusiness.status == "READY_FOR_WEBSITE_VERIFICATION")
-        return list(self.session.scalars(query).all())
+        if self.settings.pipeline_skip_processed:
+            # Idempotent re-runs (continuous engine): never re-probe / re-Tavily a candidate that
+            # already has a Phase 4 decision — only process newly collected ones.
+            decided = select(Phase4CandidateDecision.candidate_business_id)
+            query = query.where(CandidateBusiness.id.not_in(decided))
+        return list(self.session.scalars(query.limit(limit)).all())
 
     def start_run(self, operation: VerificationRunOperation, dry_run: bool, candidates: list[CandidateBusiness]) -> VerificationRun:
         run = VerificationRun(

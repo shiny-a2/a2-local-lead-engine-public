@@ -41,6 +41,7 @@ from app.services.scoring_profile_service import (
     ScoringProfileService,
 )
 from app.services.suppression_awareness_service import SuppressionAwarenessService
+from app.settings import Settings
 
 
 class LeadScoringService:
@@ -55,8 +56,9 @@ class LeadScoringService:
     }
     fit_scores = {"barber": 90.0, "beauty_salon": 90.0, "cleaning_service": 80.0}
 
-    def __init__(self, session: Session):
+    def __init__(self, session: Session, settings: Settings | None = None):
         self.session = session
+        self.settings = settings or Settings()
 
     def eligible_candidates(self, campaign_slug: str, limit: int | None = None) -> list[tuple[CandidateBusiness, Phase4CandidateDecision]]:
         campaign = self.session.scalar(select(Campaign).where(Campaign.slug == campaign_slug))
@@ -64,8 +66,15 @@ class LeadScoringService:
         if campaign:
             query = query.where(CandidateBusiness.campaign_id == campaign.id)
         candidates = self.session.scalars(query.order_by(CandidateBusiness.id)).all()
+        scored_ids: set[int] = set()
+        if self.settings.pipeline_skip_processed:
+            scored_ids = set(
+                self.session.scalars(select(Phase5CandidateDecision.candidate_business_id)).all()
+            )
         rows: list[tuple[CandidateBusiness, Phase4CandidateDecision]] = []
         for candidate in candidates:
+            if candidate.id in scored_ids:
+                continue
             decision = self._latest_phase4(candidate.id)
             if decision and decision.decision in {
                 Phase4Decision.READY_FOR_PHASE_5_SCORING,

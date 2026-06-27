@@ -54,7 +54,7 @@ def main() -> None:
         .join(CandidateBusiness, CandidateBusiness.id == hq.candidate_business_id)
         .where(
             EmailDraftVariant.campaign_lane != "IMPROVEMENT",
-            CandidateBusiness.country == "New Zealand",
+            CandidateBusiness.country.in_(["New Zealand", "Australia"]),
         )
     ).all()
     approved = 0

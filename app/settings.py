@@ -81,6 +81,9 @@ class Settings(BaseSettings):
     url_probe_user_agent: str = "A2LocalLeadEngine/phase4-verification"
     phase4_max_candidates_per_run: int = 50
     phase4_require_candidate_ready: bool = True
+    # Continuous-engine idempotency: every phase skips candidates it already processed, so a
+    # re-run only touches newly collected leads (no re-Tavily, no duplicate GPT drafts).
+    pipeline_skip_processed: bool = False
     phase4_verification_ttl_days: int = 45
     phase4_enable_contact_extraction: bool = True
     phase4_enable_weak_website_classification: bool = True
