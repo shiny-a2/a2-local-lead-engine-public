@@ -30,6 +30,7 @@ from app.services.email_relevance_agent_service import EmailRelevanceAgentServic
 from app.services.email_rule_judge_service import EmailRuleJudgeService
 from app.services.judge_disagreement_service import JudgeDisagreementService
 from app.services.phase8_manual_review_service import Phase8ManualReviewService
+from app.services.rejection_taxonomy_service import RejectionTaxonomyService
 from app.services.rewrite_brief_service import RewriteBriefService
 from app.services.variant_selection_service import VariantSelectionService
 from app.settings import Settings
@@ -175,10 +176,29 @@ class EmailJudgeOrchestratorService:
             disagreement = JudgeDisagreementService().resolve(run.id, draft.id, rule_result.passed, ai_result.decision if ai_result else None)
             if disagreement:
                 self.session.add(disagreement)
-            # Advance the draft off JUDGE_PENDING so the next cycle judges NEW drafts instead of
-            # re-judging this one forever. A rewrite/regeneration path must reset this to
-            # JUDGE_PENDING (or create a new variant) to get re-judged.
-            draft.status = EmailDraftVariantStatus.JUDGED
+            # Advance the draft off JUDGE_PENDING so the next cycle judges NEW drafts. A TEXT-only
+            # rejection is routed into the bounded rewrite loop (no lead burned for wording); a
+            # CONTACT rejection or an exhausted lineage is NOT rewritten (rewording can't fix a
+            # wrong recipient). Everything else is terminally JUDGED.
+            rejected = decision in {
+                EmailJudgeDecisionValue.REWRITE_REQUIRED,
+                EmailJudgeDecisionValue.MANUAL_REVIEW_REQUIRED,
+            } or "BLOCKED" in decision.value
+            if (
+                rejected
+                and self.settings.email_rewrite_enabled
+                and draft.rewrite_attempt < self.settings.email_rewrite_max_attempts
+                and RejectionTaxonomyService().classify_judge(findings) == "TEXT_FIXABLE"
+            ):
+                draft.status = EmailDraftVariantStatus.AWAITING_REWRITE
+            elif (
+                rejected
+                and self.settings.email_rewrite_enabled
+                and draft.rewrite_attempt >= self.settings.email_rewrite_max_attempts
+            ):
+                draft.status = EmailDraftVariantStatus.REWRITE_EXHAUSTED
+            else:
+                draft.status = EmailDraftVariantStatus.JUDGED
 
     def _decision(self, rule_passed: bool, findings: list[dict[str, object]], ai_result) -> tuple[EmailJudgeDecisionValue, float]:
         blockers = [f for f in findings if f["severity"] == GateSeverity.BLOCKER.value]

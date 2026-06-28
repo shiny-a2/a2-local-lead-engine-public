@@ -152,6 +152,10 @@ class Settings(BaseSettings):
     global_outreach_kill_switch: bool = True
     country_compliance_enforced: bool = False
     pre_send_qa_enabled: bool = False
+    # Text-rewrite-retry loop: a draft rejected for a TEXT reason is rewritten by GPT and re-judged
+    # rather than burned. Bounded per lineage. CONTACT rejections never enter this loop.
+    email_rewrite_enabled: bool = False
+    email_rewrite_max_attempts: int = 2
     controlled_send_enabled: bool = False
     provider_send_enabled: bool = False
     email_provider: str = "cpanel_smtp"

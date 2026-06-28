@@ -16,6 +16,7 @@ export AI_GENERATION_ENABLED=true EMAIL_DRAFTING_ENABLED=true
 export EMAIL_JUDGE_ENABLED=true EMAIL_JUDGE_MODE=RULE_ONLY EMAIL_RELEVANCE_AGENT_ENABLED=true
 export COUNTRY_COMPLIANCE_ENFORCED=true PRE_SEND_QA_ENABLED=true
 export PIPELINE_SKIP_PROCESSED=true   # idempotent: each cycle only processes NEW leads
+export EMAIL_REWRITE_ENABLED=true     # rewrite text-rejected drafts instead of burning the lead
 
 # Rotate the target each cycle to explore a fresh segment. NZ + Australia only (both allow
 # B2B cold email with unsubscribe); the country gate blocks anything else anyway.
@@ -50,6 +51,9 @@ echo "==== acquisition: $CAT in $CITY, $COUNTRY ===="
 "$PY" -m app.cli.main score candidates --campaign "$C" --limit 300 --commit >/dev/null 2>&1
 "$PY" -m app.cli.main insight generate --campaign "$C" --limit 300 --commit >/dev/null 2>&1
 "$PY" -m app.cli.main email generate --campaign "$C" --limit 300 --commit >/dev/null 2>&1
+"$PY" -m app.cli.main judge emails --campaign "$C" --commit >/dev/null 2>&1
+# Rewrite TEXT-rejected drafts, then re-judge the rewrites in the same cycle (no lead burned).
+"$PY" -m app.cli.main email rewrite --campaign "$C" --limit 50 --commit 2>&1 | grep -E "rewrites_produced" || true
 "$PY" -m app.cli.main judge emails --campaign "$C" --commit >/dev/null 2>&1
 "$PY" -m app.cli.main review build-queue --campaign "$C" --commit >/dev/null 2>&1
 

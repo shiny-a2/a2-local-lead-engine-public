@@ -254,7 +254,7 @@ class EmailWriterService:
             }
         )
 
-    def _store_variant(self, run, candidate, generation_input, tone_profile, item) -> None:
+    def _store_variant(self, run, candidate, generation_input, tone_profile, item) -> EmailDraftVariant:
         subject = str(item.get("subject", "A simple website idea"))
         body = str(item.get("body", ""))
         subject_meta = SubjectLineService().generate(candidate.display_name, str(item.get("variant_label", "A")), self.settings)
@@ -306,6 +306,140 @@ class EmailWriterService:
                 warnings_json=precheck.risk_flags_json,
             )
         )
+        return draft
+
+    # ---- Text-rewrite-retry loop (no lead burned for a TEXT rejection) ----
+
+    def rewrite_awaiting_drafts(self, campaign_slug: str, limit: int, commit: bool) -> int:
+        """GPT-rewrite drafts parked in AWAITING_REWRITE to fix exactly the issues that got them
+        rejected, as a NEW JUDGE_PENDING variant (the next judge pass re-scores it). Bounded per
+        lineage by email_rewrite_max_attempts; never touches the recipient; never re-rewrites a
+        candidate that already sent. Returns how many rewrites were produced."""
+        from sqlalchemy import select as _select
+
+        from app.db.models.campaign import Campaign as _Campaign
+        from app.db.models.email_judge_finding import EmailJudgeFinding
+        from app.db.models.email_send_queue import EmailSendQueue
+        from app.db.models.phase6_candidate_decision import Phase6CandidateDecision
+
+        if not self.settings.email_rewrite_enabled:
+            return 0
+        campaign = self.session.scalar(_select(_Campaign).where(_Campaign.slug == campaign_slug))
+        if campaign is None:
+            return 0
+        sent_candidates = set(
+            self.session.scalars(
+                _select(EmailSendQueue.candidate_business_id).where(
+                    EmailSendQueue.queue_status.in_(["SENT_TO_PROVIDER", "SENDING"])
+                )
+            ).all()
+        )
+        drafts = self.session.scalars(
+            _select(EmailDraftVariant)
+            .join(CandidateBusiness, CandidateBusiness.id == EmailDraftVariant.candidate_business_id)
+            .where(
+                EmailDraftVariant.status == EmailDraftVariantStatus.AWAITING_REWRITE,
+                EmailDraftVariant.rewrite_attempt < self.settings.email_rewrite_max_attempts,
+                CandidateBusiness.campaign_id == campaign.id,
+            )
+            .order_by(EmailDraftVariant.id)
+            .limit(limit)
+        ).all()
+        if not drafts:
+            return 0
+        run = EmailGenerationRun(
+            run_id=RunContext().run_id,
+            campaign_id=campaign.id,
+            operation=EmailGenerationOperation.PHASE7_FULL_GENERATION,
+            status=EmailGenerationRunStatus.STARTED,
+            dry_run=not commit,
+            model_provider="openai" if self._ai_allowed() else "local_template",
+            model_name=self.settings.openai_email_model or "local_template_v1",
+            input_candidate_count=len(drafts),
+            metadata_json={"campaign_type": "rewrite", "openai_calls_attempted": self._ai_allowed()},
+        )
+        self.session.add(run)
+        self.session.flush()
+        produced = 0
+        for draft in drafts:
+            if draft.candidate_business_id in sent_candidates:
+                draft.status = EmailDraftVariantStatus.JUDGED  # already won via another variant
+                continue
+            candidate = self.session.get(CandidateBusiness, draft.candidate_business_id)
+            phase6 = self.session.scalar(
+                _select(Phase6CandidateDecision)
+                .where(
+                    Phase6CandidateDecision.candidate_business_id == draft.candidate_business_id,
+                    Phase6CandidateDecision.ready_for_phase7.is_(True),
+                )
+                .order_by(Phase6CandidateDecision.id.desc())
+            )
+            if candidate is None or phase6 is None:
+                draft.status = EmailDraftVariantStatus.REWRITE_EXHAUSTED
+                continue
+            issues = [
+                f.message
+                for f in self.session.scalars(
+                    _select(EmailJudgeFinding).where(EmailJudgeFinding.email_draft_variant_id == draft.id)
+                ).all()
+            ] or ["the previous draft was rejected; make it more specific and fully grounded"]
+            generation_input = EmailInputAssemblerService(self.session, self.settings).assemble(run.id, candidate, phase6)
+            self.session.add(generation_input)
+            self.session.flush()
+            template = PromptTemplateService(self.session).choose(generation_input.input_snapshot_json.get("campaign_lane", "NO_WEBSITE"), candidate.canonical_category)
+            try:
+                output = self._rewrite_model(generation_input, draft.body_text, issues)
+                item = json.loads(output)["drafts"][0]
+            except Exception:
+                draft.status = EmailDraftVariantStatus.REWRITE_EXHAUSTED
+                continue
+            item["variant_label"] = f"R{draft.rewrite_attempt + 1}"
+            new_draft = self._store_variant(run, candidate, generation_input, template.tone_profile, item)
+            new_draft.rewrite_attempt = draft.rewrite_attempt + 1
+            new_draft.origin_email_draft_variant_id = draft.origin_email_draft_variant_id or draft.id
+            draft.status = EmailDraftVariantStatus.JUDGED  # superseded by the rewrite
+            produced += 1
+        self._finish(run)
+        self.session.commit()
+        return produced
+
+    def _rewrite_model(self, generation_input: "EmailGenerationInput", original_body: str, issues: list[str]) -> str:
+        if not self._ai_allowed():
+            return self._local_json(generation_input)  # free path: a fresh clean local draft
+        from app.services.openai_client import OpenAIClient
+
+        snapshot = generation_input.input_snapshot_json or {}
+        offers = [o.get("text") for o in (generation_input.offer_blocks_json or []) if o.get("text")]
+        if not offers and snapshot.get("offer_summary"):
+            offers = [snapshot["offer_summary"]]
+        placeholder = snapshot.get("unsubscribe_placeholder", self.settings.email_unsubscribe_placeholder)
+        system = (
+            "You are REWRITING a cold outreach email for Amirali Yaghouti (he builds simple websites "
+            "for local businesses) that a strict reviewer REJECTED. Fix EVERY listed issue while keeping "
+            "the email about THIS exact business. Do NOT change who it is addressed to. Rules: 5 to 6 "
+            f"complete sentences, AT LEAST {self.settings.email_min_words + 30} words, under "
+            f"{self.settings.email_max_words - 10} words, calm plain tone with NO exclamation marks, "
+            "exactly one soft question as the call to action, ground every claim ONLY in the allowed "
+            "offer ideas/claims, never invent facts/prices/guarantees, never make a claim the reviewer "
+            f"called unsupported, sign as Amirali Yaghouti, and end the body with the literal token {placeholder}. "
+            'Return ONLY JSON: {"drafts":[{"variant_label":"R","subject":"...","body":"...",'
+            '"evidence_keys":["business_name","local_context"],"claim_texts":["..."]}]}.'
+        )
+        user = json.dumps(
+            {
+                "business_name": snapshot.get("business_name"),
+                "local_context": snapshot.get("local_context"),
+                "category": snapshot.get("category"),
+                "campaign_lane": snapshot.get("campaign_lane"),
+                "offer_ideas": offers,
+                "allowed_claims": generation_input.allowed_claims_json or offers,
+                "do_not_say": generation_input.blocked_claims_json or [],
+                "previous_rejected_body": original_body,
+                "issues_to_fix": issues,
+            },
+            ensure_ascii=False,
+        )
+        return OpenAIClient(self.settings).chat_json(system, user)
 
     # ---- Website IMPROVEMENT campaign (separate from the no-website "build" campaign) ----
 

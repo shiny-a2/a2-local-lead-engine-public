@@ -9,6 +9,11 @@ from tests.phase9_helpers import make_phase9_queue_item
 def test_only_phase8_approved_drafts_enter_queue(session):
     campaign, judge_run, _, item, _ = make_phase9_queue_item(session)
     assert item.queue_status == HumanReviewQueueStatus.QUEUED
+    # eligible() now means "approved AND not already queued" (so duplicate decisions can't crowd
+    # out un-reviewed drafts); with its draft already queued it is correctly excluded.
+    assert not HumanReviewQueueService(session, Settings()).eligible(judge_run.run_id)
+    session.query(HumanReviewQueueItem).delete()
+    session.commit()
     assert HumanReviewQueueService(session, Settings()).eligible(judge_run.run_id)
     assert campaign.slug
 

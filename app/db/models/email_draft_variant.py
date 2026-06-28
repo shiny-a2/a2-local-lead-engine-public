@@ -19,3 +19,7 @@ class EmailDraftVariant(TimestampMixin, Base):
     campaign_lane: Mapped[str] = mapped_column(String(80), nullable=False)
     category: Mapped[str] = mapped_column(String(120), nullable=False)
     status: Mapped[EmailDraftVariantStatus] = mapped_column(Enum(EmailDraftVariantStatus, native_enum=False))
+    # Bounded text-rewrite loop: how many times this lineage has been rewritten, and the root
+    # variant a rewrite descends from (so the cap is per-lineage, not per-row).
+    rewrite_attempt: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
+    origin_email_draft_variant_id: Mapped[int | None] = mapped_column(ForeignKey("email_draft_variants.id"), nullable=True)

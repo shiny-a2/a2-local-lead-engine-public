@@ -63,12 +63,30 @@ class SendQueueService:
                     EmailSendQueueStatus.BLOCKED_BY_SEND_WINDOW,
                     EmailSendQueueStatus.BLOCKED_BY_GLOBAL_KILL_SWITCH,
                 }
+                new_draft_id = self._draft_id(decision.queue_item_id)
                 if (
                     commit
                     and provider_ok
                     and existing.queue_status in recoverable
                     and existing.retry_count < existing.max_retries
                 ):
+                    existing.queue_status = EmailSendQueueStatus.READY_TO_SEND_CONTROLLED
+                    self.session.add(SendAuditEvent(email_send_queue_id=existing.id, actor="cli", action=SendAuditAction.QUEUE_CREATED))
+                elif (
+                    commit
+                    and provider_ok
+                    and existing.queue_status == EmailSendQueueStatus.HELD_BY_OPERATOR
+                    and (existing.hold_reason or "").startswith("QA_TEXT_FIXABLE")
+                    and new_draft_id
+                    and new_draft_id != existing.email_draft_variant_id
+                ):
+                    # A TEXT-held row whose draft was rewritten + re-approved: re-aim it at the new
+                    # variant and re-arm so the controlled send re-snapshots + re-QAs the new text.
+                    # Same recipient (idempotency_key matched), so no wrong-business risk.
+                    existing.email_draft_variant_id = new_draft_id
+                    existing.phase9_decision_id = decision.id
+                    existing.email_manual_edit_version_id = None
+                    existing.hold_reason = None
                     existing.queue_status = EmailSendQueueStatus.READY_TO_SEND_CONTROLLED
                     self.session.add(SendAuditEvent(email_send_queue_id=existing.id, actor="cli", action=SendAuditAction.QUEUE_CREATED))
                 continue  # already in the send queue (idempotent rebuild)

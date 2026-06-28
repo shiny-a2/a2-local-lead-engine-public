@@ -971,6 +971,25 @@ def email_generate(
     console.print("email_sent=false approved_for_sending=false")
 
 
+@email_app.command("rewrite")
+def email_rewrite(
+    campaign: Annotated[str, typer.Option()],
+    limit: Annotated[int, typer.Option()] = 50,
+    dry_run: Annotated[bool, typer.Option("--dry-run")] = True,
+    commit: Annotated[bool, typer.Option("--commit")] = False,
+) -> None:
+    """Rewrite TEXT-rejected drafts (status AWAITING_REWRITE) into fresh JUDGE_PENDING variants
+    so the next judge pass can re-score them. Bounded per lineage; recipients never change."""
+    from app.services.email_writer_service import EmailWriterService
+
+    live = _commit_mode(dry_run, commit)
+    with session_for_cli() as session:
+        produced = EmailWriterService(session, get_settings()).rewrite_awaiting_drafts(
+            campaign, limit, commit=live
+        )
+    console.print(f"rewrites_produced={produced}")
+
+
 @email_app.command("explain")
 def email_explain(draft_id: Annotated[int, typer.Option()]) -> None:
     from app.db.models.email_draft_claim_usage import EmailDraftClaimUsage

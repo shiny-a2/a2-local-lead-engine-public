@@ -5,6 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.enums import (
+    EmailDraftVariantStatus,
     EmailProviderType,
     EmailSendQueueStatus,
     Phase10Decision,
@@ -17,6 +18,7 @@ from app.core.enums import (
 from app.core.run_context import RunContext
 from app.db.models.campaign import Campaign
 from app.db.models.candidate_business import CandidateBusiness
+from app.db.models.email_draft_variant import EmailDraftVariant
 from app.db.models.email_send_attempt import EmailSendAttempt
 from app.db.models.email_send_queue import EmailSendQueue
 from app.db.models.phase10_candidate_decision import Phase10CandidateDecision
@@ -133,7 +135,22 @@ class ControlledSendService:
                 snapshot.final_subject_snapshot, snapshot.final_body_snapshot,
             )
             if not qa["go"]:
-                self._block(item, run, Phase10Decision.HELD_FOR_MANUAL_SEND_REVIEW, EmailSendQueueStatus.HELD_BY_OPERATOR, "pre-send QA blocked: " + "; ".join(qa["issues"])[:280])
+                # Classify WHY: a TEXT problem routes the draft into the rewrite loop; a CONTACT
+                # problem (wrong recipient) must NOT be reworded-and-resent — it stays held.
+                from app.services.rejection_taxonomy_service import RejectionTaxonomyService
+
+                bucket = RejectionTaxonomyService().classify_qa(qa["issues"])
+                draft = self.session.get(EmailDraftVariant, item.email_draft_variant_id)
+                text_fixable = (
+                    bucket == "TEXT_FIXABLE"
+                    and self.settings.email_rewrite_enabled
+                    and draft is not None
+                    and draft.rewrite_attempt < self.settings.email_rewrite_max_attempts
+                )
+                if text_fixable:
+                    draft.status = EmailDraftVariantStatus.AWAITING_REWRITE
+                tag = "QA_TEXT_FIXABLE" if text_fixable else "QA_CONTACT_FIXABLE"
+                self._block(item, run, Phase10Decision.HELD_FOR_MANUAL_SEND_REVIEW, EmailSendQueueStatus.HELD_BY_OPERATOR, f"{tag}: " + "; ".join(qa["issues"])[:240])
                 return
         provider = self.provider or self._provider()
         run.metadata_json = {**(run.metadata_json or {}), "provider_call_attempted": True}
@@ -186,6 +203,7 @@ class ControlledSendService:
 
     def _block(self, item: EmailSendQueue, run: SendQueueRun, decision: Phase10Decision, status: EmailSendQueueStatus, reason: str) -> None:
         item.queue_status = status
+        item.hold_reason = reason[:280]
         run.blocked_count += 1
         self.session.add(Phase10CandidateDecision(candidate_business_id=item.candidate_business_id, send_queue_run_id=run.id, email_send_queue_id=item.id, decision=decision, blocked=True, reason=reason))
         self.session.add(EmailSendAttempt(email_send_queue_id=item.id, provider_type=EmailProviderType(self.settings.email_provider) if self.settings.email_provider in EmailProviderType._value2member_map_ else EmailProviderType.CPANEL_SMTP, provider_status=ProviderStatus.BLOCKED, attempt_status=SendAttemptStatus.BLOCKED_BEFORE_SEND, attempt_number=item.retry_count + 1, error_type="BLOCKED", error_message=reason))
