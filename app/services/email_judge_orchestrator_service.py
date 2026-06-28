@@ -175,6 +175,10 @@ class EmailJudgeOrchestratorService:
             disagreement = JudgeDisagreementService().resolve(run.id, draft.id, rule_result.passed, ai_result.decision if ai_result else None)
             if disagreement:
                 self.session.add(disagreement)
+            # Advance the draft off JUDGE_PENDING so the next cycle judges NEW drafts instead of
+            # re-judging this one forever. A rewrite/regeneration path must reset this to
+            # JUDGE_PENDING (or create a new variant) to get re-judged.
+            draft.status = EmailDraftVariantStatus.JUDGED
 
     def _decision(self, rule_passed: bool, findings: list[dict[str, object]], ai_result) -> tuple[EmailJudgeDecisionValue, float]:
         blockers = [f for f in findings if f["severity"] == GateSeverity.BLOCKER.value]

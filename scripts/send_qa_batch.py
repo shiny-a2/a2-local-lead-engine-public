@@ -12,6 +12,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from sqlalchemy import select
 
+from app.core.enums import EmailSendQueueStatus
 from app.db.models.campaign import Campaign
 from app.db.models.candidate_business import CandidateBusiness
 from app.db.models.candidate_contact_verification import CandidateContactVerification
@@ -26,7 +27,7 @@ from app.settings import Settings
 
 DO_SEND = "--send" in sys.argv
 CAMPAIGN = "auckland-local-website-pilot"
-BATCH_LIMIT = 5  # warm-up: a few per run
+BATCH_LIMIT = 8  # warm-up: a few per run; daily cap below bounds total volume
 
 
 def main() -> None:
@@ -36,6 +37,8 @@ def main() -> None:
         pre_send_qa_enabled=True,
         send_window_enabled=False,
         send_per_run_limit=BATCH_LIMIT,
+        send_daily_limit=20,  # warm-up ceiling; raise as the domain warms
+        send_per_domain_daily_limit=1,
         global_outreach_kill_switch=not DO_SEND,
         email_sending_enabled=DO_SEND,
         controlled_send_enabled=DO_SEND,
@@ -46,7 +49,8 @@ def main() -> None:
     if not campaign:
         print("campaign not found")
         return
-    # Eligible: NZ, no-website lane, verified safe contact, queued for review.
+    # Eligible review items: NZ/AU, non-improvement lane. Dedupe to ONE (latest) per candidate so
+    # one business with many review items can't crowd out the rest.
     hq = HumanReviewQueueItem
     items = session.scalars(
         select(hq)
@@ -56,21 +60,36 @@ def main() -> None:
             EmailDraftVariant.campaign_lane != "IMPROVEMENT",
             CandidateBusiness.country.in_(["New Zealand", "Australia"]),
         )
+        .order_by(hq.id)
     ).all()
+    by_candidate = {item.candidate_business_id: item for item in items}  # highest id wins
+    # Skip a candidate ONLY if it already has a queue row that is in flight or settled — NOT
+    # SEND_DRY_RUN_PLANNED / transient blocks (those get recovered in build_queue).
+    settled_states = {
+        EmailSendQueueStatus.QUEUED_FOR_SEND,
+        EmailSendQueueStatus.READY_TO_SEND_CONTROLLED,
+        EmailSendQueueStatus.SENDING,
+        EmailSendQueueStatus.SENT_TO_PROVIDER,
+        EmailSendQueueStatus.HELD_BY_OPERATOR,
+        EmailSendQueueStatus.CANCELLED_BY_OPERATOR,
+    }
     approved = 0
-    for item in items:
+    for cid, item in by_candidate.items():
         contact = session.scalar(
             select(CandidateContactVerification).where(
-                CandidateContactVerification.candidate_business_id == item.candidate_business_id,
+                CandidateContactVerification.candidate_business_id == cid,
                 CandidateContactVerification.outreach_contact_allowed.is_(True),
             )
         )
-        already_queued = session.scalar(
+        if not contact:
+            continue
+        settled = session.scalar(
             select(EmailSendQueue).where(
-                EmailSendQueue.candidate_business_id == item.candidate_business_id
+                EmailSendQueue.candidate_business_id == cid,
+                EmailSendQueue.queue_status.in_(settled_states),
             )
         )
-        if not contact or already_queued:
+        if settled:
             continue
         try:
             HumanDecisionService(session, settings).approve(item.id, "Amirali", "warm-up batch")

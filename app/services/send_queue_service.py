@@ -52,7 +52,25 @@ class SendQueueService:
                 continue
             domain = recipient_email.split("@")[-1].lower()
             key = guard.idempotency_key(campaign.id, decision.candidate_business_id, recipient_email)
-            if self.session.scalar(select(EmailSendQueue).where(EmailSendQueue.idempotency_key == key)):
+            existing = self.session.scalar(select(EmailSendQueue).where(EmailSendQueue.idempotency_key == key))
+            if existing:
+                # Recover items that were parked but never sent so they re-enter the controlled
+                # send. Never touch settled rows (sent / operator-held / cancelled / permanent).
+                recoverable = {
+                    EmailSendQueueStatus.SEND_DRY_RUN_PLANNED,
+                    EmailSendQueueStatus.FAILED_TRANSIENT,
+                    EmailSendQueueStatus.BLOCKED_BY_DAILY_LIMIT,
+                    EmailSendQueueStatus.BLOCKED_BY_SEND_WINDOW,
+                    EmailSendQueueStatus.BLOCKED_BY_GLOBAL_KILL_SWITCH,
+                }
+                if (
+                    commit
+                    and provider_ok
+                    and existing.queue_status in recoverable
+                    and existing.retry_count < existing.max_retries
+                ):
+                    existing.queue_status = EmailSendQueueStatus.READY_TO_SEND_CONTROLLED
+                    self.session.add(SendAuditEvent(email_send_queue_id=existing.id, actor="cli", action=SendAuditAction.QUEUE_CREATED))
                 continue  # already in the send queue (idempotent rebuild)
             duplicate_ok, _ = guard.check(key)
             if not duplicate_ok:

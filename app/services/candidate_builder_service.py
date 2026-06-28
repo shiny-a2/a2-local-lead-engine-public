@@ -25,6 +25,21 @@ from app.services.chain_risk_service import ChainRiskService
 from app.services.manual_review_service import ManualReviewService
 from app.services.normalization_service import NormalizationService
 
+# OSM addr:country tags use ISO codes; the compliance config + send filter key on full names and
+# fail closed on anything else. Canonicalise so 'NZ' and 'New Zealand' resolve to one jurisdiction.
+_COUNTRY_CANONICAL = {
+    "nz": "New Zealand", "nzl": "New Zealand", "new zealand": "New Zealand",
+    "au": "Australia", "aus": "Australia", "australia": "Australia",
+    "gb": "United Kingdom", "uk": "United Kingdom", "united kingdom": "United Kingdom",
+    "ie": "Ireland", "irl": "Ireland", "ireland": "Ireland",
+    "ca": "Canada", "can": "Canada", "canada": "Canada",
+    "us": "United States", "usa": "United States", "united states": "United States",
+}
+
+
+def _canonical_country(value: str) -> str:
+    return _COUNTRY_CANONICAL.get((value or "").strip().lower(), value)
+
 
 class CandidateBuilderService:
     def __init__(self, session: Session):
@@ -101,7 +116,7 @@ class CandidateBuilderService:
             source_city = raw.source_run.city if raw.source_run else None
             source_country = raw.source_run.country if raw.source_run else None
             resolved_city = raw.raw_city or source_city or ""
-            resolved_country = raw.raw_country or source_country or ""
+            resolved_country = _canonical_country(raw.raw_country or source_country or "")
             if not name.normalized_name or not category:
                 run.rejected_count += 1
                 continue

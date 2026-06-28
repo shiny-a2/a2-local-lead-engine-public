@@ -41,7 +41,20 @@ class HumanReviewQueueService:
             if run is None:
                 return []
             query = query.where(EmailJudgeDecision.email_judge_run_id == run.id)
-        return list(self.session.scalars(query.order_by(EmailJudgeDecision.id)).all())
+        # Keep ONE (latest) decision per draft and drop drafts already in the review queue, so
+        # duplicate decisions from earlier re-judging can't consume the per-run cap and starve
+        # un-reviewed drafts. Without this, the oldest 5 candidates' duplicate rows fill the slice.
+        already_queued = set(self.session.scalars(select(HumanReviewQueueItem.email_draft_variant_id)).all())
+        seen: set[int] = set()
+        fresh: list[EmailJudgeDecision] = []
+        for decision in self.session.scalars(query.order_by(EmailJudgeDecision.id.desc())).all():
+            draft_id = decision.email_draft_variant_id
+            if draft_id in seen or draft_id in already_queued:
+                continue
+            seen.add(draft_id)
+            fresh.append(decision)
+        fresh.reverse()
+        return fresh
 
     def build_queue(self, campaign_slug: str, judge_run_id: str | None, commit: bool) -> HumanReviewRun:
         campaign = self.session.scalar(select(Campaign).where(Campaign.slug == campaign_slug))
