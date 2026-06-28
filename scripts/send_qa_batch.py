@@ -37,7 +37,7 @@ def main() -> None:
         pre_send_qa_enabled=True,
         send_window_enabled=False,
         send_per_run_limit=BATCH_LIMIT,
-        send_daily_limit=20,  # warm-up ceiling; raise as the domain warms
+        send_daily_limit=30,  # warm-up ceiling; raise as the domain warms
         send_per_domain_daily_limit=1,
         global_outreach_kill_switch=not DO_SEND,
         email_sending_enabled=DO_SEND,
