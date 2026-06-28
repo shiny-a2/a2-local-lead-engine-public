@@ -208,6 +208,10 @@ class Phase4VerificationOrchestrator:
                 )
                 if emails:
                     snippet += f" {emails[0]}"
+                # Emails published on the business's own homepage (same-domain only) become
+                # contact candidates, classified + domain-checked like any other.
+                for scraped in probed.get("scraped_emails", []):
+                    snippet += f" {scraped}"
                 results.append(
                     {
                         "title": probed.get("title") or candidate.display_name,

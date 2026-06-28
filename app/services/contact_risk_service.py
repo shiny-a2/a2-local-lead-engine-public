@@ -12,9 +12,11 @@ ROLE_PREFIXES = {
     "inquiries", "inquiry", "admin", "office", "officemanager", "reception", "bookings",
     "booking", "book", "appointment", "appointments", "orders", "order", "sales", "accounts",
     "support", "service", "services", "customerservice", "team", "mail", "email", "reservations",
-    "reserve", "help", "care", "careers", "marketing", "franchising", "salon", "studio", "clinic",
+    "reserve", "help", "care", "salon", "studio", "clinic",
     "shop", "store", "frontdesk", "desk", "general", "manager", "owner",
 }
+# Deliberately NOT roles for sales outreach: careers/jobs/recruitment (job seekers),
+# franchising (franchise buyers), marketing (dept inbox) — emailing those is a wrong-audience miss.
 PERSONAL_DOMAINS = {"gmail.com", "outlook.com", "hotmail.com", "yahoo.com"}
 
 
@@ -23,7 +25,9 @@ class ContactRiskService:
         local, _, domain = email.lower().partition("@")
         if domain in PERSONAL_DOMAINS:
             return EmailType.PERSONAL, ContactRiskLevel.BLOCKED, "PERSONAL_EMAIL_DOMAIN"
-        if official_domain and domain and official_domain not in domain:
+        norm_domain = domain.removeprefix("www.")
+        norm_official = (official_domain or "").lower().removeprefix("www.")
+        if norm_official and norm_domain and norm_official not in norm_domain:
             return EmailType.UNKNOWN, ContactRiskLevel.HIGH, "CONTACT_DOMAIN_MISMATCH"
         if local in ROLE_PREFIXES:
             return EmailType.ROLE_BASED, ContactRiskLevel.LOW, None
